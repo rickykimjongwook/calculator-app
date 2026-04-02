@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 const buttons = [
   ["C", "±", "%", "÷"],
@@ -12,10 +13,36 @@ const buttons = [
 
 const operatorKeys = ["÷", "×", "-", "+"];
 
+type Calculation = {
+  id: number;
+  expression: string;
+  result: string;
+  created_at: string;
+};
+
 export default function Home() {
   const [expression, setExpression] = useState("");
   const [display, setDisplay] = useState("0");
   const [justCalculated, setJustCalculated] = useState(false);
+  const [history, setHistory] = useState<Calculation[]>([]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  async function fetchHistory() {
+    const { data } = await supabase
+      .from("calculations")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    if (data) setHistory(data);
+  }
+
+  async function saveCalculation(expr: string, result: string) {
+    await supabase.from("calculations").insert({ expression: expr, result });
+    fetchHistory();
+  }
 
   function handleButton(value: string) {
     if (value === "C") {
@@ -50,6 +77,7 @@ export default function Home() {
         // eslint-disable-next-line no-eval
         const result = eval(evalExpression);
         const resultStr = String(parseFloat(result.toFixed(10)));
+        saveCalculation(expression, resultStr);
         setDisplay(resultStr);
         setExpression(resultStr);
         setJustCalculated(true);
@@ -74,7 +102,6 @@ export default function Home() {
       return;
     }
 
-    // 숫자 또는 소수점
     if (justCalculated) {
       setExpression(value);
       setDisplay(value);
@@ -84,8 +111,6 @@ export default function Home() {
 
     const newExpr = expression + value;
     setExpression(newExpr);
-
-    // 디스플레이: 현재 입력 중인 숫자만 표시
     const parts = newExpr.split(/[+\-×÷]/);
     setDisplay(parts[parts.length - 1] || "0");
   }
@@ -95,15 +120,14 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-8">
+      {/* 계산기 */}
       <div className="w-80 rounded-3xl overflow-hidden shadow-2xl bg-black">
-        {/* 디스플레이 */}
         <div className="px-6 pt-12 pb-4 text-right">
           <p className="text-zinc-500 text-sm h-5 truncate">{expression || " "}</p>
           <p className="text-white text-6xl font-light mt-1 truncate">{display}</p>
         </div>
 
-        {/* 버튼 */}
         <div className="grid grid-cols-4 gap-3 p-4">
           {buttons.map((row, rowIdx) =>
             row.map((btn, colIdx) => {
@@ -133,6 +157,21 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* 계산 기록 */}
+      {history.length > 0 && (
+        <div className="w-80">
+          <p className="text-zinc-500 text-sm mb-2">최근 계산 기록</p>
+          <div className="flex flex-col gap-1">
+            {history.map((item) => (
+              <div key={item.id} className="flex justify-between text-sm px-2">
+                <span className="text-zinc-400">{item.expression}</span>
+                <span className="text-white">= {item.result}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
