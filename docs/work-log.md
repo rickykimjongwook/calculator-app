@@ -638,3 +638,51 @@ LOG-14 코드 작업 완료 후 Vercel 배포에서 오류가 3번 연속 발생
 - **`git ls-files`로 배포 전 추적 파일 목록을 확인하는 습관**이 필요하다. 로컬에서 `npm run build`가 성공해도, git에 없는 파일은 Vercel에서 없는 것과 같다.
 - **`@/` alias는 로컬에서는 동작해도 Vercel에서 실패할 수 있다.** tsconfig `paths` 설정이 있어도 빌드 환경에 따라 해석이 다를 수 있으므로, 문제가 생기면 상대경로로 바꾸는 것이 확실한 해결책.
 - **구조 이전 시 구버전 파일을 git에서 명시적으로 삭제해야 한다.** 로컬에서 파일을 옮기거나 삭제해도 `git rm`을 하지 않으면 git은 여전히 구버전을 추적한다.
+
+---
+
+## [LOG-16] 2026-04-03 — 폴더 구조 혼재의 경위
+
+### LOG-15의 근본 원인 상세
+
+**`create-next-app` 초기 커밋 구조 (2026-04-02)**
+
+```
+app/           ← 루트에 직접 생성 (src/ 없음)
+  favicon.ico
+  globals.css
+  layout.tsx
+  page.tsx
+```
+
+`create-next-app`이 `src/` 없이 루트 `app/`으로 프로젝트를 생성했다. 이후 계산기 앱 초기 버전과 Supabase DB 연동도 모두 이 구조(`app/page.tsx`, `lib/supabase.ts`)를 기준으로 커밋됐다.
+
+**LOG-14 Auth 작업에서 구조 충돌 발생**
+
+Auth 기능 추가(LOG-14) 시 Claude Code가 `tsconfig.json`의 `"@/*": ["./src/*"]` 경로를 기준으로 `src/app/page.tsx`에 새 파일을 생성했다. 그 결과:
+
+```
+app/page.tsx      ← 기존 구버전 (Supabase만 있는 버전)
+src/app/page.tsx  ← 신버전 (Auth 포함)
+```
+
+두 구조가 공존하면서 Vercel이 구버전 `app/page.tsx`를 사용 → 상단 바가 안 보이는 오류 발생.
+
+**올바른 구조 (수정 후)**
+
+```
+src/
+  app/
+    favicon.ico
+    globals.css
+    layout.tsx
+    page.tsx    ← Auth 포함 신버전
+  lib/
+    supabase.ts
+```
+
+### 배운 것
+
+- **`create-next-app` 실행 시 `src/` 디렉토리 포함 여부를 확인해야 한다.** 이 옵션에 따라 이후 모든 파일 경로가 달라진다.
+- **새 파일을 만들기 전에 기존 파일이 어디 있는지 확인해야 한다.** `tsconfig.json`의 alias 설정과 실제 파일 위치가 다를 수 있다.
+- Claude Code도 프로젝트 구조를 잘못 파악하면 엉뚱한 경로에 파일을 만든다. 새 기능 작업 시작 전 **`git ls-files`로 현재 추적 파일 목록을 확인**하는 게 좋다.
