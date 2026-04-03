@@ -298,6 +298,7 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-zinc-900 rounded-2xl p-6 w-72 flex flex-col gap-4">
             <h2 className="text-white text-lg font-medium">로그인 / 가입</h2>
+            <p className="text-zinc-400 text-xs leading-relaxed">아이디만으로 가입합니다. 로그인 시에도 아이디만 입력합니다.</p>
             <input
               value={authInput}
               onChange={(e) => setAuthInput(e.target.value.toLowerCase())}
