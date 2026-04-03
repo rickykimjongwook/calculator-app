@@ -520,7 +520,78 @@ oauth 인증을 터미널에서 대신할 수는 없나?
 
 ---
 
-## [LOG-14] 2026-04-03 — Supabase Auth 회원 기능 추가
+## [LOG-14] 2026-04-03 — VVC 폴더 구조 전면 개편
+
+### 배경
+
+에이전틱 코딩 환경을 위해 "VS Code 창 하나 = 프로젝트 하나"로 열었을 때,
+코드·문서·변수가 모두 한 폴더에 있어야 에이전트가 작업하는 동안 work-log도
+같이 쌓을 수 있다는 걸 깨달았다.
+
+기존 구조는 Guides/와 Variables/가 Projects/와 분리되어 있어 이 방식이 불가능했다.
+
+### 변경 전 구조
+
+```
+VVC/
+├── Projects/
+│   └── calculator-app/       ← git root
+│       ├── app/              ← Next.js 코드 (루트에 직접)
+│       ├── lib/
+│       └── public/
+├── Guides/                   ← 최상위 분리 폴더
+│   └── calculator-app-guide/
+│       ├── guide.md
+│       ├── work-log.md
+│       ├── learning.md
+│       └── 콘텐츠/
+└── Variables/                ← 최상위 분리 폴더
+    └── calculator-app-variables/
+        ├── Supabase.md
+        └── github PAT token.md
+```
+
+### 변경 후 구조
+
+```
+VVC/
+└── Projects/
+    └── calculator-app/       ← git root (변경 없음)
+        ├── src/              ← Next.js 코드 (src/ 컨벤션으로 이동)
+        │   ├── app/
+        │   └── lib/
+        ├── docs/             ← 문서를 프로젝트 안으로 통합
+        │   ├── docs.md       ← 이전 guide.md에서 이름 변경
+        │   ├── work-log.md
+        │   ├── learning.md
+        │   └── 콘텐츠/
+        ├── variables/        ← 민감 정보를 프로젝트 안으로 통합 (gitignore)
+        │   ├── Supabase.md
+        │   └── github PAT token.md
+        └── public/
+```
+
+### 변경 내역 상세
+
+| 대상 | 변경 전 | 변경 후 |
+|------|---------|---------|
+| 문서 폴더명 | `Guides/` | (삭제, 프로젝트 내부로 통합) |
+| 문서 하위폴더 | `Guides/calculator-app-guide/` | `Projects/calculator-app/docs/` |
+| 가이드 파일명 | `guide.md` | `docs.md` |
+| 변수 폴더 | `Variables/calculator-app-variables/` | `Projects/calculator-app/variables/` |
+| 코드 위치 | `calculator-app/app/`, `lib/` | `calculator-app/src/app/`, `src/lib/` |
+| tsconfig path | `"@/*": ["./*"]` | `"@/*": ["./src/*"]` |
+| .gitignore | `github PAT token.md` 개별 제외 | `/variables/` 폴더 전체 제외 추가 |
+
+### 배운 것
+
+- **자기완결적 프로젝트 구조**: 에이전틱 코딩에서는 에이전트가 열린 폴더 안에서만 작업하므로, 코드·문서·변수가 한 폴더 안에 있어야 에이전트가 work-log까지 함께 관리할 수 있다.
+- **`src/` 컨벤션**: Next.js는 루트 `app/`과 `src/app/` 모두 지원한다. `src/`를 쓰면 코드와 설정 파일(package.json, tsconfig 등)이 명확히 분리된다.
+- **구조 변경 시 tsconfig path alias 업데이트 필수**: `@/*`가 `./src/*`를 가리키도록 변경하지 않으면 import가 깨진다. 변경 후 `npm run build`로 반드시 검증할 것.
+
+---
+
+## [LOG-15] 2026-04-03 — Supabase Auth 회원 기능 추가
 
 ### 프롬프트
 
@@ -599,11 +670,11 @@ ON calculations FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 ---
 
-## [LOG-15] 2026-04-03 — 배포 오류 연속 트러블슈팅
+## [LOG-16] 2026-04-03 — 배포 오류 연속 트러블슈팅
 
 ### 상황
 
-LOG-14 코드 작업 완료 후 Vercel 배포에서 오류가 3번 연속 발생.
+LOG-15 코드 작업 완료 후 Vercel 배포에서 오류가 3번 연속 발생.
 
 ---
 
@@ -641,9 +712,9 @@ LOG-14 코드 작업 완료 후 Vercel 배포에서 오류가 3번 연속 발생
 
 ---
 
-## [LOG-16] 2026-04-03 — 폴더 구조 혼재의 경위
+## [LOG-17] 2026-04-03 — 폴더 구조 혼재의 경위
 
-### LOG-15의 근본 원인 상세
+### LOG-16의 근본 원인 상세
 
 **`create-next-app` 초기 커밋 구조 (2026-04-02)**
 
@@ -657,9 +728,9 @@ app/           ← 루트에 직접 생성 (src/ 없음)
 
 `create-next-app`이 `src/` 없이 루트 `app/`으로 프로젝트를 생성했다. 이후 계산기 앱 초기 버전과 Supabase DB 연동도 모두 이 구조(`app/page.tsx`, `lib/supabase.ts`)를 기준으로 커밋됐다.
 
-**LOG-14 Auth 작업에서 구조 충돌 발생**
+**LOG-15 Auth 작업에서 구조 충돌 발생**
 
-Auth 기능 추가(LOG-14) 시 Claude Code가 `tsconfig.json`의 `"@/*": ["./src/*"]` 경로를 기준으로 `src/app/page.tsx`에 새 파일을 생성했다. 그 결과:
+Auth 기능 추가(LOG-15) 시 Claude Code가 `tsconfig.json`의 `"@/*": ["./src/*"]` 경로를 기준으로 `src/app/page.tsx`에 새 파일을 생성했다. 그 결과:
 
 ```
 app/page.tsx      ← 기존 구버전 (Supabase만 있는 버전)
