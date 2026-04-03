@@ -596,3 +596,45 @@ ON calculations FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 - "에이전트로서 모든 걸 스스로 완결하기를 나는 기대해" → Claude Code가 계획 → 코드 → 빌드 → 배포까지 자율적으로 처리
 - 구현 범위를 번호+들여쓰기로 명확히 나열하면 누락 없이 모두 구현됨
+
+---
+
+## [LOG-15] 2026-04-03 — 배포 오류 연속 트러블슈팅
+
+### 상황
+
+LOG-14 코드 작업 완료 후 Vercel 배포에서 오류가 3번 연속 발생.
+
+---
+
+### 오류 1: 상단 바가 아예 안 보임
+
+**원인:** 이전 커밋(`feat: supabase DB 연동`)에서 루트 레벨 `app/page.tsx`가 git에 올라가 있었음. 새로 만든 `src/app/page.tsx`와 두 파일이 공존하면서 Vercel이 구버전을 사용.
+
+**해결:** `git rm app/page.tsx app/layout.tsx app/globals.css app/favicon.ico lib/supabase.ts`로 루트 레벨 구버전 파일 삭제 후 push.
+
+---
+
+### 오류 2: `Module not found: Can't resolve '@/lib/supabase'`
+
+**원인:** `src/lib/supabase.ts`가 로컬에는 있었지만 git에 커밋이 안 된 상태. Vercel은 git 파일만 빌드하므로 파일 자체를 찾지 못함.
+
+**해결:** `git add src/lib/supabase.ts` 후 커밋.
+
+---
+
+### 오류 3: 같은 오류 반복 — `Module not found: Can't resolve '@/lib/supabase'`
+
+**원인:** `src/lib/supabase.ts`는 추가됐지만 `src/app/layout.tsx`, `src/app/globals.css`, `src/app/favicon.ico`도 누락되어 있었음. 이 파일들 추가 후에도 `@/` alias가 Vercel 빌드 환경에서 정상 해석되지 않는 문제가 남아 있었음.
+
+**해결:** import 경로를 `@/lib/supabase` → `../lib/supabase` (상대경로)로 변경.
+
+### 근본 원인 정리
+
+프로젝트 초기에 `src/` 없이 루트에 `app/`, `lib/`을 만들었다가 나중에 `src/` 구조로 이전하면서 발생한 파일 관리 문제. **git에 추적되지 않은 파일은 Vercel에서 없는 것과 같다.**
+
+### 배운 것
+
+- **`git ls-files`로 배포 전 추적 파일 목록을 확인하는 습관**이 필요하다. 로컬에서 `npm run build`가 성공해도, git에 없는 파일은 Vercel에서 없는 것과 같다.
+- **`@/` alias는 로컬에서는 동작해도 Vercel에서 실패할 수 있다.** tsconfig `paths` 설정이 있어도 빌드 환경에 따라 해석이 다를 수 있으므로, 문제가 생기면 상대경로로 바꾸는 것이 확실한 해결책.
+- **구조 이전 시 구버전 파일을 git에서 명시적으로 삭제해야 한다.** 로컬에서 파일을 옮기거나 삭제해도 `git rm`을 하지 않으면 git은 여전히 구버전을 추적한다.
